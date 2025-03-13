@@ -1,8 +1,9 @@
 package filen
 
 import (
-	"github.com/rclone/rclone/fstest/fstests"
 	"testing"
+
+	"github.com/rclone/rclone/fstest/fstests"
 )
 
 func TestIntegration(t *testing.T) {

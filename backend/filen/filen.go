@@ -5,8 +5,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	pathModule "path"
+	"strings"
+	"time"
+
 	sdk "github.com/FilenCloudDienste/filen-sdk-go/filen"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
+
 	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/fs/config"
 	"github.com/rclone/rclone/fs/config/configmap"
@@ -14,10 +20,6 @@ import (
 	"github.com/rclone/rclone/fs/config/obscure"
 	"github.com/rclone/rclone/fs/hash"
 	"github.com/rclone/rclone/lib/encoder"
-	"io"
-	pathModule "path"
-	"strings"
-	"time"
 )
 
 func init() {
@@ -497,7 +499,7 @@ func (file *File) SetModTime(ctx context.Context, t time.Time) error {
 func (file *File) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadCloser, error) {
 	fs.FixRangeOption(options, file.Size())
 	// Create variables to hold our options
-	var offset int64 = 0
+	var offset int64
 	var limit int64 = -1 // -1 means no limit
 
 	// Parse the options
@@ -535,7 +537,7 @@ func (file *File) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, o
 	return nil
 }
 
-// Removes this object
+// Remove this object
 func (file *File) Remove(ctx context.Context) error {
 	err := file.fs.filen.TrashFile(ctx, *file.file)
 	if err != nil {
