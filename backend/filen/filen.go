@@ -16,6 +16,7 @@ import (
 	"github.com/rclone/rclone/lib/encoder"
 	"io"
 	pathModule "path"
+	"strings"
 	"time"
 )
 
@@ -52,6 +53,30 @@ You can download the Filen CLI from https://github.com/FilenCloudDienste/filen-c
 				Help:     config.ConfigEncodingHelp,
 				Advanced: true,
 				Default:  encoder.Standard | encoder.EncodeInvalidUtf8,
+			}, {
+				Name:      "MasterKeys",
+				Help:      "Master Keys (internal use only)",
+				Sensitive: true,
+				Advanced:  true,
+			}, {
+				Name:      "PrivateKey",
+				Help:      "Private RSA Key (internal use only)",
+				Sensitive: true,
+				Advanced:  true,
+			}, {
+				Name:      "PublicKey",
+				Help:      "Public RSA Key (internal use only)",
+				Sensitive: true,
+				Advanced:  true,
+			}, {
+				Name:     "AuthVersion",
+				Help:     "Authentication Version (internal use only)",
+				Advanced: true,
+			}, {
+				Name:      "BaseFolderUUID",
+				Help:      "UUID of Account Root Directory (internal use only)",
+				Sensitive: true,
+				Advanced:  true,
 			},
 		},
 	})
@@ -73,10 +98,29 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 	if err != nil {
 		return nil, fmt.Errorf("failed to reveal api key: %w", err)
 	}
-	filen, err := sdk.NewWithAPIKey(ctx, opt.Email, password, apiKey)
-	if err != nil {
-		return nil, err
+
+	var filen *sdk.Filen
+	if password == "INTERNAL" {
+		tsconfig := sdk.TSConfig{
+			Email:          opt.Email,
+			MasterKeys:     strings.Split(opt.MasterKeys, "|"),
+			APIKey:         apiKey,
+			PublicKey:      opt.PublicKey,
+			PrivateKey:     opt.PrivateKey,
+			AuthVersion:    opt.AuthVersion,
+			BaseFolderUUID: opt.BaseFolderUUID,
+		}
+		filen, err = sdk.NewFromTSConfig(tsconfig)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		filen, err = sdk.NewWithAPIKey(ctx, opt.Email, password, apiKey)
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	maybeRootDir, err := filen.FindDirectory(ctx, root)
 	if errors.Is(err, fs.ErrorIsFile) { // FsIsFile special case
 		var err2 error
@@ -108,10 +152,15 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 
 // Options defines the configuration for this backend
 type Options struct {
-	Email    string               `config:"Email"`
-	Password string               `config:"Password"`
-	APIKey   string               `config:"API Key"`
-	Encoder  encoder.MultiEncoder `config:"encoding"`
+	Email          string               `config:"Email"`
+	Password       string               `config:"Password"`
+	APIKey         string               `config:"API Key"`
+	Encoder        encoder.MultiEncoder `config:"encoding"`
+	MasterKeys     string
+	PrivateKey     string
+	PublicKey      string
+	AuthVersion    int
+	BaseFolderUUID string
 }
 
 // Fs represents a virtual filesystem mounted on a specific root folder
