@@ -20,6 +20,7 @@ import (
 	"github.com/rclone/rclone/fs/config/configstruct"
 	"github.com/rclone/rclone/fs/config/obscure"
 	"github.com/rclone/rclone/fs/hash"
+	"github.com/rclone/rclone/fs/walk"
 	"github.com/rclone/rclone/lib/encoder"
 	"golang.org/x/sync/errgroup"
 )
@@ -884,6 +885,102 @@ func (f *Fs) dirMoveEntireDir(ctx context.Context, srcDir *types.Directory, oldP
 		return err
 	}
 	return err
+}
+
+// ListR lists the objects and directories of the Fs starting
+// from dir recursively into out.
+//
+// dir should be "" to start from the root, and should not
+// have trailing slashes.
+//
+// This should return ErrDirNotFound if the directory isn't
+// found.
+//
+// It should call callback for each tranche of entries read.
+// These need not be returned in any particular order.  If
+// callback returns an error then the listing will stop
+// immediately.
+//
+// Don't implement this unless you have a more efficient way
+// of listing recursively that doing a directory traversal.
+func (f *Fs) ListR(ctx context.Context, dir string, callback fs.ListRCallback) (err error) {
+	basePath := f.Enc.FromStandardPath(dir)
+	path := f.resolvePath(basePath)
+	foundDir, err := f.filen.FindDirectory(ctx, path)
+	if err != nil {
+		return err
+	}
+	if foundDir == nil {
+		return fs.ErrorDirNotFound
+	}
+
+	files, dirs, err := f.filen.ListRecursive(ctx, foundDir)
+	if err != nil {
+		return err
+	}
+	list := walk.NewListRHelper(callback)
+	// have to build paths
+	uuidDirMap, uuidPathMap := buildUUIDDirMaps(basePath, foundDir, dirs)
+
+	for _, dir := range dirs {
+		path, err := getPathForUUID(dir.GetUUID(), uuidPathMap, uuidDirMap)
+		if err != nil {
+			return err
+		}
+		err = list.Add(&Directory{
+			fs:        f,
+			directory: dir,
+			path:      path,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, file := range files {
+		parentPath, err := getPathForUUID(file.GetParent(), uuidPathMap, uuidDirMap)
+		if err != nil {
+			return err
+		}
+		err = list.Add(&File{
+			fs:   f,
+			file: file,
+			path: pathModule.Join(parentPath, file.GetName()),
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return list.Flush()
+}
+
+func buildUUIDDirMaps(rootPath string, rootDir types.DirectoryInterface, dirs []*types.Directory) (map[string]types.DirectoryInterface, map[string]string) {
+	uuidPathMap := make(map[string]string, len(dirs)+1)
+	uuidPathMap[rootDir.GetUUID()] = rootPath
+
+	uuidDirMap := make(map[string]types.DirectoryInterface, len(dirs)+1)
+	uuidDirMap[rootDir.GetUUID()] = rootDir
+	for _, dir := range dirs {
+		uuidDirMap[dir.GetUUID()] = dir
+	}
+	return uuidDirMap, uuidPathMap
+}
+
+func getPathForUUID(uuid string, uuidPathMap map[string]string, uuidDirMap map[string]types.DirectoryInterface) (string, error) {
+	if path, ok := uuidPathMap[uuid]; ok {
+		return path, nil
+	}
+	dir, ok := uuidDirMap[uuid]
+	if !ok {
+		return "", fs.ErrorDirNotFound
+	}
+	parentPath, err := getPathForUUID(dir.GetParent(), uuidPathMap, uuidDirMap)
+	if err != nil {
+		return "", err
+	}
+	path := pathModule.Join(parentPath, dir.GetName())
+	uuidPathMap[uuid] = path
+	return path, nil
 }
 
 // helpers
