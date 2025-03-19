@@ -744,6 +744,148 @@ func moveFileObjIntoNewPath(obj *File, newPath string) *File {
 	return newFile
 }
 
+// DirMove moves src, srcRemote to this remote at dstRemote
+// using server-side move operations.
+//
+// Will only be called if src.Fs().Name() == f.Name()
+//
+// If it isn't possible then return fs.ErrorCantDirMove
+//
+// If destination exists then return fs.ErrorDirExists
+func (f *Fs) DirMove(ctx context.Context, src fs.Fs, srcRemote, dstRemote string) error {
+
+	srcF, ok := src.(*Fs)
+	if !ok || srcF == nil {
+		return fs.ErrorCantDirMove
+	}
+	g, gCtx := errgroup.WithContext(ctx)
+	var (
+		srcDirInt types.DirectoryInterface
+		dstDir    types.DirectoryInterface
+		srcPath   = srcF.resolvePath(srcF.Enc.FromStandardPath(srcRemote))
+		dstPath   = f.resolvePath(f.Enc.FromStandardPath(dstRemote))
+	)
+	if srcPath == dstPath {
+		return fs.ErrorDirExists
+	}
+
+	g.Go(func() error {
+		var err error
+		srcDirInt, err = srcF.filen.FindDirectory(gCtx, srcPath)
+		return err
+	})
+	g.Go(func() error {
+		var err error
+		dstDir, err = f.filen.FindDirectory(gCtx, dstPath)
+		return err
+	})
+
+	if err := g.Wait(); err != nil {
+		return err
+	}
+
+	if srcDirInt == nil {
+		return fs.ErrorDirNotFound
+	}
+
+	if dstDir != nil {
+		return f.dirMoveContents(ctx, srcDirInt, dstDir, srcPath, dstPath)
+	}
+
+	srcDir, ok := srcDirInt.(*types.Directory)
+	if !ok {
+		return fs.ErrorCantDirMove
+	}
+
+	return f.dirMoveEntireDir(ctx, srcDir, srcPath, dstPath)
+}
+
+// dirMoveContents moves the contents of srcDir to dstDir
+// used for the case where the target directory exists
+// recurses if needed
+func (f *Fs) dirMoveContents(ctx context.Context, srcDir, dstDir types.DirectoryInterface, srcPath, dstPath string) error {
+	g, gCtx := errgroup.WithContext(ctx)
+	var (
+		srcDirs  []*types.Directory
+		srcFiles []*types.File
+		dstDirs  []*types.Directory
+		dstFiles []*types.File
+	)
+
+	// read source and target
+	g.Go(func() error {
+		var err error
+		srcFiles, srcDirs, err = f.filen.ReadDirectory(gCtx, srcDir)
+		return err
+	})
+	g.Go(func() error {
+		var err error
+		dstFiles, dstDirs, err = f.filen.ReadDirectory(gCtx, dstDir)
+		return err
+	})
+
+	if err := g.Wait(); err != nil {
+		return err
+	}
+
+	dstDirNamesSet := make(map[string]*types.Directory, len(dstDirs)+len(dstFiles))
+	for _, dir := range dstDirs {
+		dstDirNamesSet[dir.GetName()] = dir
+	}
+
+	g, gCtx = errgroup.WithContext(ctx)
+	g.SetLimit(sdk.MaxSmallCallers)
+
+	for _, dir := range srcDirs {
+		currSrcPath := pathModule.Join(srcPath, dir.GetName())
+		currDstPath := pathModule.Join(dstPath, dir.GetName())
+		if dupDir, ok := dstDirNamesSet[dir.GetName()]; ok {
+			// if duplicate, recurse
+			g.Go(func() error {
+				return f.dirMoveContents(gCtx, dir, dupDir, currSrcPath, currDstPath)
+			})
+		} else {
+			// else move
+			g.Go(func() error {
+				return f.moveWithParentUUID(gCtx, dir, dstDir.GetUUID())
+			})
+		}
+	}
+
+	for _, file := range srcFiles {
+		// move all files with overwrite
+		g.Go(func() error {
+			return f.moveWithParentUUID(gCtx, file, dstDir.GetUUID())
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// dirMoveEntireDir moves srcDir to newPath
+// used for the case where the target directory doesn't exist
+func (f *Fs) dirMoveEntireDir(ctx context.Context, srcDir *types.Directory, oldPath string, newPath string) error {
+	oldParentPath, newParentPath := getPathDir(oldPath), getPathDir(newPath)
+	oldName, newName := pathModule.Base(oldPath), pathModule.Base(newPath)
+	var err error
+	if oldPath == newPath {
+		return fs.ErrorDirExists
+	} else if oldParentPath == newParentPath {
+		err = f.rename(ctx, srcDir, newPath, newName)
+	} else if newName == oldName {
+		err = f.move(ctx, srcDir, newPath, newParentPath)
+	} else {
+		err = f.moveWithRename(ctx, srcDir, oldPath, oldName, newPath, newParentPath, newName)
+	}
+	if err != nil {
+		return err
+	}
+	return err
+}
+
 // helpers
 
 // resolvePath returns the absolute path specified by the input path, which is seen relative to the remote's root.
