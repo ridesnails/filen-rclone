@@ -574,6 +574,22 @@ func (file *File) ParentID() string {
 	return file.file.GetParent()
 }
 
+// Purge all files in the directory specified
+//
+// Implement this if you have a way of deleting all the files
+// quicker than just running Remove() on the result of List()
+//
+// Return an error if it doesn't exist
+func (f *Fs) Purge(ctx context.Context, dir string) error {
+	path := f.resolvePath(f.Enc.FromStandardPath(dir))
+	foundDir, err := f.filen.FindDirectory(ctx, path)
+	if err != nil {
+		return err
+	} else if foundDir == nil {
+		return fs.ErrorDirNotFound
+	}
+	return f.filen.TrashDirectory(ctx, foundDir)
+}
 // helpers
 
 // resolvePath returns the absolute path specified by the input path, which is seen relative to the remote's root.
