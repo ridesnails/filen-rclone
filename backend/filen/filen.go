@@ -983,6 +983,26 @@ func getPathForUUID(uuid string, uuidPathMap map[string]string, uuidDirMap map[s
 	return path, nil
 }
 
+// About gets quota information from the Fs
+func (f *Fs) About(ctx context.Context) (*fs.Usage, error) {
+	userInfo, err := f.filen.GetUserInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	total := int64(userInfo.MaxStorage)
+	used := int64(userInfo.UsedStorage)
+	free := total - used
+	return &fs.Usage{
+		Total:   &total,
+		Used:    &used,
+		Trashed: nil,
+		Other:   nil,
+		Free:    &free,
+		Objects: nil,
+	}, nil
+}
+
 // CleanUp the trash in the Fs
 func (f *Fs) CleanUp(ctx context.Context) error {
 	// not sure if this is implemented correctly, since this trashes ALL trash
