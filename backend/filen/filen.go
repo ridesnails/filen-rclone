@@ -983,6 +983,15 @@ func getPathForUUID(uuid string, uuidPathMap map[string]string, uuidDirMap map[s
 	return path, nil
 }
 
+// CleanUp the trash in the Fs
+func (f *Fs) CleanUp(ctx context.Context) error {
+	// not sure if this is implemented correctly, since this trashes ALL trash
+	// not just the trash in the currently mounted fs
+	// not currently wiping file versions because that feels dangerous
+	// especially since versioning can be toggled on/off
+	return f.filen.EmptyTrash(ctx)
+}
+
 // helpers
 
 // resolvePath returns the absolute path specified by the input path, which is seen relative to the remote's root.
