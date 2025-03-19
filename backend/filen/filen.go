@@ -1029,11 +1029,24 @@ func getPathDir(path string) string {
 
 // Check the interfaces are satisfied
 var (
-	_ fs.Fs        = (*Fs)(nil)
-	_ fs.Directory = (*Directory)(nil)
-	//_ fs.SetModTimer = (*Directory)(nil) todo
-	_ fs.Object     = (*File)(nil)
-	_ fs.MimeTyper  = (*File)(nil)
-	_ fs.IDer       = (*File)(nil)
-	_ fs.ParentIDer = (*File)(nil)
+	_ fs.Fs          = &Fs{}
+	_ fs.Mover       = &Fs{}
+	_ fs.DirMover    = &Fs{}
+	_ fs.Purger      = &Fs{}
+	_ fs.PutStreamer = &Fs{}
+	_ fs.CleanUpper  = &Fs{}
+	_ fs.ListRer     = &Fs{}
+	_ fs.Abouter     = &Fs{}
+	_ fs.Directory   = &Directory{}
+	_ fs.Object      = &File{}
+	_ fs.MimeTyper   = &File{}
+	_ fs.IDer        = &File{}
+	_ fs.ParentIDer  = &File{}
 )
+
+// todo PublicLinker,
+// we could technically implement ChangeNotifier, but
+// 1) the current implementation on Filen's side isn't great, it's worth waiting until SSE
+// 2) I'm not really clear that the benefits are so great
+// a bunch of the information would get wasted, since the Filen does actually specify exact updates,
+// whereas rclone seems to only accept a path and object type
