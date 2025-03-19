@@ -13,6 +13,7 @@ import (
 	sdk "github.com/FilenCloudDienste/filen-sdk-go/filen"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 
+	"github.com/google/uuid"
 	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/fs/config"
 	"github.com/rclone/rclone/fs/config/configmap"
@@ -20,6 +21,7 @@ import (
 	"github.com/rclone/rclone/fs/config/obscure"
 	"github.com/rclone/rclone/fs/hash"
 	"github.com/rclone/rclone/lib/encoder"
+	"golang.org/x/sync/errgroup"
 )
 
 func init() {
@@ -551,6 +553,9 @@ func (file *File) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, o
 
 // Remove this object
 func (file *File) Remove(ctx context.Context) error {
+	if file.file == nil {
+		return nil
+	}
 	err := file.fs.filen.TrashFile(ctx, *file.file)
 	if err != nil {
 		return err
@@ -590,11 +595,168 @@ func (f *Fs) Purge(ctx context.Context, dir string) error {
 	}
 	return f.filen.TrashDirectory(ctx, foundDir)
 }
+
+// Move src to this remote using server-side move operations.
+//
+// # This is stored with the remote path given
+//
+// # It returns the destination Object and a possible error
+//
+// Will only be called if src.Fs().Name() == f.Name()
+//
+// If it isn't possible then return fs.ErrorCantMove
+func (f *Fs) Move(ctx context.Context, src fs.Object, remote string) (fs.Object, error) {
+	obj, ok := src.(*File)
+	if !ok {
+		return nil, fmt.Errorf("can't move %T: %w", src, fs.ErrorCantMove)
+	}
+	newRemote := f.Enc.FromStandardPath(remote)
+	oldPath, newPath := obj.fs.resolvePath(f.Enc.FromStandardPath(src.Remote())), f.resolvePath(newRemote)
+	oldParentPath, newParentPath := getPathDir(oldPath), getPathDir(newPath)
+	oldName, newName := pathModule.Base(oldPath), pathModule.Base(newPath)
+	var err error
+	if oldPath == newPath {
+		return nil, fs.ErrorCantMove
+	} else if oldParentPath == newParentPath {
+		err = f.rename(ctx, obj.file, newPath, newName)
+	} else if newName == oldName {
+		err = f.move(ctx, obj.file, newPath, newParentPath)
+	} else {
+		err = f.moveWithRename(ctx, obj.file, oldPath, oldName, newPath, newParentPath, newName)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return moveFileObjIntoNewPath(obj, newRemote), nil
+}
+
+// moveWithRename moves item to newPath
+// using a more complex set of operations designed to handle the fact that
+// Filen doesn't support a single moveRename operation
+// which requires some annoying hackery to get around reliably
+func (f *Fs) moveWithRename(ctx context.Context, item types.NonRootFileSystemObject, oldPath, oldName, newPath, newParentPath, newName string) error {
+	g, gCtx := errgroup.WithContext(ctx)
+	var (
+		newParentDir  types.DirectoryInterface
+		renamedToUUID bool
+	)
+
+	// rename to random UUID first
+	g.Go(func() error {
+		var err error
+		err = f.filen.Rename(gCtx, item, uuid.NewString())
+		if err != nil {
+			return fmt.Errorf("failed to rename file: %w : %w", err, fs.ErrorCantMove)
+		}
+		renamedToUUID = true
+		return nil
+	})
+	defer func() {
+		// safety to try and not leave the item in a bad state
+		if renamedToUUID {
+			err := f.filen.Rename(ctx, item, oldName)
+			if err != nil {
+				fmt.Printf("ERROR: FAILED TO REVERT UUID RENAME for file %s: %s", oldPath, err)
+			}
+		}
+	}()
+
+	// find parent dir
+	g.Go(func() error {
+		var err error
+		newParentDir, err = f.filen.FindDirectoryOrCreate(gCtx, newParentPath)
+		return err
+	})
+
+	if err := g.Wait(); err != nil {
+		return err
+	}
+
+	// move
+	oldParentUUID := item.GetParent()
+	err := f.filen.MoveItem(ctx, item, newParentDir.GetUUID(), true)
+	if err != nil {
+		return fmt.Errorf("failed to move file: %w : %w", err, fs.ErrorCantMove)
+	}
+	defer func() {
+		// safety to try and not leave the item in a bad state
+		if renamedToUUID {
+			err := f.filen.MoveItem(ctx, item, oldParentUUID, true)
+			if err != nil {
+				fmt.Printf("ERROR: FAILED TO REVERT MOVE for file %s: %s", oldPath, err)
+			}
+		}
+	}()
+
+	// rename to final name
+	err = f.filen.Rename(ctx, item, newName)
+	if err != nil {
+		return fmt.Errorf("failed to rename file: %w : %w", err, fs.ErrorCantMove)
+	}
+	renamedToUUID = false
+
+	return nil
+}
+
+// move moves item to newPath
+// by finding the parent and calling moveWithParentUUID
+func (f *Fs) move(ctx context.Context, item types.NonRootFileSystemObject, newPath, newParentPath string) error {
+	newParentDir, err := f.filen.FindDirectoryOrCreate(ctx, newParentPath)
+	if err != nil {
+		return fmt.Errorf("failed to find or create directory: %w : %w", err, fs.ErrorCantMove)
+	}
+	return f.moveWithParentUUID(ctx, item, newParentDir.GetUUID())
+}
+
+// moveWithParentUUID moves item to newParentUUID
+// using a simple filen.MoveItem operation
+func (f *Fs) moveWithParentUUID(ctx context.Context, item types.NonRootFileSystemObject, newParentUUID string) error {
+	err := f.filen.MoveItem(ctx, item, newParentUUID, true)
+	if err != nil {
+		return fmt.Errorf("failed to move file: %w : %w", err, fs.ErrorCantMove)
+	}
+
+	return nil
+}
+
+// rename moves item to newPath
+// using a simple Filen rename operation
+func (f *Fs) rename(ctx context.Context, item types.NonRootFileSystemObject, newPath string, newName string) error {
+	err := f.filen.Rename(ctx, item, newName)
+	if err != nil {
+		return fmt.Errorf("failed to rename item: %w : %w", err, fs.ErrorCantMove)
+	}
+	return nil
+}
+
+// moveFileObjIntoNewPath 'moves' an existing object into a new path
+// invalidating the previous object
+// and making a copy with the passed path
+//
+// this is to work around the fact that rclone expects to have to delete a file after moving
+func moveFileObjIntoNewPath(obj *File, newPath string) *File {
+	newFile := &File{
+		fs:   obj.fs,
+		path: newPath,
+		file: obj.file,
+	}
+	obj.file = nil
+	return newFile
+}
+
 // helpers
 
 // resolvePath returns the absolute path specified by the input path, which is seen relative to the remote's root.
 func (f *Fs) resolvePath(path string) string {
 	return pathModule.Join(f.root.path, path)
+}
+
+func getPathDir(path string) string {
+	dir := pathModule.Dir(path)
+	if dir == "." {
+		return ""
+	}
+	return dir
 }
 
 // Check the interfaces are satisfied
