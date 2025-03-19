@@ -146,14 +146,9 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 	}
 
 	fileSystem.features = (&fs.Features{
-		ReadMimeType: true,
-		//WriteMimeType:           true, // requires parsing metadata options, todo later
+		ReadMimeType:            true,
+		WriteMimeType:           true,
 		CanHaveEmptyDirectories: true,
-		// ReadMetadata: true,
-		// WriteMetadata: true,
-		// ReadDirMetadata ?
-		// WriteDirMetadata ?
-		//TODO more optional features?
 	}).Fill(ctx, fileSystem)
 
 	fileSystem.root = Directory{
@@ -303,7 +298,7 @@ func (f *Fs) Put(ctx context.Context, in io.Reader, src fs.ObjectInfo, options .
 	if err != nil {
 		return nil, err
 	}
-	incompleteFile, err := types.NewIncompleteFile(f.filen.AuthVersion, pathModule.Base(resolvedPath), "", modTime, modTime, parent)
+	incompleteFile, err := types.NewIncompleteFile(f.filen.AuthVersion, pathModule.Base(resolvedPath), fs.MimeType(ctx, src), modTime, modTime, parent)
 	if err != nil {
 		return nil, err
 	}
@@ -544,6 +539,7 @@ func (file *File) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, o
 	}
 	newIncomplete.LastModified = newModTime
 	newIncomplete.Created = newModTime
+	newIncomplete.MimeType = fs.MimeType(ctx, src)
 	uploadedFile, err := file.fs.filen.UploadFile(ctx, newIncomplete, in)
 	if err != nil {
 		return err
