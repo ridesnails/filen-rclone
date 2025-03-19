@@ -142,6 +142,17 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 		Enc:   opt.Encoder,
 	}
 
+	fileSystem.features = (&fs.Features{
+		ReadMimeType: true,
+		//WriteMimeType:           true, // requires parsing metadata options, todo later
+		CanHaveEmptyDirectories: true,
+		// ReadMetadata: true,
+		// WriteMetadata: true,
+		// ReadDirMetadata ?
+		// WriteDirMetadata ?
+		//TODO more optional features?
+	}).Fill(ctx, fileSystem)
+
 	fileSystem.root = Directory{
 		fs:        fileSystem,
 		directory: maybeRootDir, // could be null at this point
@@ -167,10 +178,11 @@ type Options struct {
 
 // Fs represents a virtual filesystem mounted on a specific root folder
 type Fs struct {
-	name  string
-	root  Directory
-	filen *sdk.Filen
-	Enc   encoder.MultiEncoder
+	name     string
+	root     Directory
+	filen    *sdk.Filen
+	Enc      encoder.MultiEncoder
+	features *fs.Features
 }
 
 // Name of the remote (as passed into NewFs)
@@ -200,16 +212,7 @@ func (f *Fs) Hashes() hash.Set {
 
 // Features returns the optional features of this Fs
 func (f *Fs) Features() *fs.Features {
-	return &fs.Features{
-		ReadMimeType: true,
-		//WriteMimeType:           true, // requires parsing metadata options, todo later
-		CanHaveEmptyDirectories: true,
-		// ReadMetadata: true,
-		// WriteMetadata: true,
-		// ReadDirMetadata ?
-		// WriteDirMetadata ?
-		//TODO more optional features?
-	}
+	return f.features
 }
 
 // List the objects and directories in dir into entries.  The
