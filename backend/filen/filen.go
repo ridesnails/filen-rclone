@@ -611,10 +611,15 @@ func (f *Fs) Move(ctx context.Context, src fs.Object, remote string) (fs.Object,
 	oldPath, newPath := obj.fs.resolvePath(f.Enc.FromStandardPath(src.Remote())), f.resolvePath(newRemote)
 	oldParentPath, newParentPath := getPathDir(oldPath), getPathDir(newPath)
 	oldName, newName := pathModule.Base(oldPath), pathModule.Base(newPath)
-	var err error
 	if oldPath == newPath {
 		return nil, fs.ErrorCantMove
-	} else if oldParentPath == newParentPath {
+	}
+	err := f.filen.Lock(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer f.filen.Unlock()
+	if oldParentPath == newParentPath {
 		err = f.rename(ctx, obj.file, newPath, newName)
 	} else if newName == oldName {
 		err = f.move(ctx, obj.file, newPath, newParentPath)
@@ -755,6 +760,11 @@ func (f *Fs) DirMove(ctx context.Context, src fs.Fs, srcRemote, dstRemote string
 	if !ok || srcF == nil {
 		return fs.ErrorCantDirMove
 	}
+	err := f.filen.Lock(ctx)
+	if err != nil {
+		return err
+	}
+	defer f.filen.Unlock()
 	g, gCtx := errgroup.WithContext(ctx)
 	var (
 		srcDirInt types.DirectoryInterface
