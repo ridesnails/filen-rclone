@@ -62,16 +62,16 @@ jobs:
       - name: Build Windows AMD64
         if: matrix.os == 'windows-latest' && matrix.platform == 'amd64'
         run: |
-          set CGO_ENABLED=1
+          $env:CGO_ENABLED = "1"
           go build -trimpath -ldflags -s -tags cmount -o rclone-amd64.exe
 
       - name: Build Windows ARM64
         if: matrix.os == 'windows-latest' && matrix.platform == 'arm64'
         run: |
-          set CGO_ENABLED=1
-          set GOARCH=arm64
-          set CC=zig cc -target aarch64-windows
-          set CXX=zig c++ -target aarch64-windows
+          $env:CGO_ENABLED = "1"
+          $env:GOARCH = "arm64"
+          $env:CC = "zig cc -target aarch64-windows"
+          $env:CXX = "zig c++ -target aarch64-windows"
           go build -trimpath -ldflags -s -tags cmount -o rclone-arm64.exe
 
       - name: Upload rclone artifact (Linux AMD64)
