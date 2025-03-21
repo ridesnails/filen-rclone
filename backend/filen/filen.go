@@ -298,7 +298,7 @@ func (f *Fs) Put(ctx context.Context, in io.Reader, src fs.ObjectInfo, options .
 	if err != nil {
 		return nil, err
 	}
-	incompleteFile, err := types.NewIncompleteFile(f.filen.AuthVersion, pathModule.Base(resolvedPath), fs.MimeType(ctx, src), modTime, modTime, parent)
+	incompleteFile, err := types.NewIncompleteFile(f.filen.FileEncryptionVersion, pathModule.Base(resolvedPath), fs.MimeType(ctx, src), modTime, modTime, parent)
 	if err != nil {
 		return nil, err
 	}
@@ -533,7 +533,7 @@ func (file *File) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadCl
 // return an error or update the object properly (rather than e.g. calling panic).
 func (file *File) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) error {
 	newModTime := src.ModTime(ctx)
-	newIncomplete, err := file.file.NewFromBase(file.fs.filen.AuthVersion)
+	newIncomplete, err := file.file.NewFromBase(file.fs.filen.FileEncryptionVersion)
 	if err != nil {
 		return err
 	}
@@ -609,7 +609,7 @@ func (f *Fs) Move(ctx context.Context, src fs.Object, remote string) (fs.Object,
 	}
 	newRemote := f.Enc.FromStandardPath(remote)
 	oldPath, newPath := obj.fs.resolvePath(f.Enc.FromStandardPath(src.Remote())), f.resolvePath(newRemote)
-	oldParentPath, newParentPath := getPathDir(oldPath), getPathDir(newPath)
+	oldParentPath, newParentPath := pathModule.Dir(oldPath), pathModule.Dir(newPath)
 	oldName, newName := pathModule.Base(oldPath), pathModule.Base(newPath)
 	if oldPath == newPath {
 		return nil, fs.ErrorCantMove
@@ -875,7 +875,7 @@ func (f *Fs) dirMoveContents(ctx context.Context, srcDir, dstDir types.Directory
 // dirMoveEntireDir moves srcDir to newPath
 // used for the case where the target directory doesn't exist
 func (f *Fs) dirMoveEntireDir(ctx context.Context, srcDir *types.Directory, oldPath string, newPath string) error {
-	oldParentPath, newParentPath := getPathDir(oldPath), getPathDir(newPath)
+	oldParentPath, newParentPath := pathModule.Dir(oldPath), pathModule.Dir(newPath)
 	oldName, newName := pathModule.Base(oldPath), pathModule.Base(newPath)
 	var err error
 	if oldPath == newPath {
@@ -1023,14 +1023,6 @@ func (f *Fs) CleanUp(ctx context.Context) error {
 // resolvePath returns the absolute path specified by the input path, which is seen relative to the remote's root.
 func (f *Fs) resolvePath(path string) string {
 	return pathModule.Join(f.root.path, path)
-}
-
-func getPathDir(path string) string {
-	dir := pathModule.Dir(path)
-	if dir == "." {
-		return ""
-	}
-	return dir
 }
 
 // Check the interfaces are satisfied
