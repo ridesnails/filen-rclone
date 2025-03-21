@@ -539,7 +539,7 @@ func (file *File) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, o
 	}
 	newIncomplete.LastModified = newModTime
 	newIncomplete.Created = newModTime
-	newIncomplete.MimeType = fs.MimeType(ctx, src)
+	newIncomplete.SetMimeType(fs.MimeType(ctx, src))
 	uploadedFile, err := file.fs.filen.UploadFile(ctx, newIncomplete, in)
 	if err != nil {
 		return err
