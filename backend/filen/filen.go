@@ -58,7 +58,26 @@ You can download the Filen CLI from https://github.com/FilenCloudDienste/filen-c
 				Help:     config.ConfigEncodingHelp,
 				Advanced: true,
 				Default:  encoder.Standard | encoder.EncodeInvalidUtf8,
-			}, {
+			},
+			{
+				Name:     "Max Download Threads",
+				Help:     "The maximum number of threads to use when downloading files.",
+				Advanced: true,
+				Default:  sdk.DefaultMaxDownloadThreads,
+			},
+			{
+				Name:     "Max Download Threads per File",
+				Help:     "The maximum number of threads per file to use when downloading files.",
+				Advanced: true,
+				Default:  sdk.DefaultMaxDownloadThreadsPerFile,
+			},
+			{
+				Name:     "Max Upload Threads",
+				Help:     "The maximum number of threads to use when uploading files.",
+				Advanced: true,
+				Default:  sdk.DefaultMaxUploadThreads,
+			},
+			{
 				Name:      "MasterKeys",
 				Help:      "Master Keys (internal use only)",
 				Sensitive: true,
@@ -126,6 +145,10 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 		}
 	}
 
+	filen.MaxDownloadThreadsPerFile = opt.MaxDownloadThreadsPerFile
+	filen.DownloadThreadSem = make(chan struct{}, opt.MaxDownloadThreads)
+	filen.UploadThreadSem = make(chan struct{}, opt.MaxUploadThreads)
+
 	maybeRootDir, err := filen.FindDirectory(ctx, root)
 	if errors.Is(err, fs.ErrorIsFile) { // FsIsFile special case
 		var err2 error
@@ -163,15 +186,18 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 
 // Options defines the configuration for this backend
 type Options struct {
-	Email          string               `config:"Email"`
-	Password       string               `config:"Password"`
-	APIKey         string               `config:"API Key"`
-	Encoder        encoder.MultiEncoder `config:"encoding"`
-	MasterKeys     string
-	PrivateKey     string
-	PublicKey      string
-	AuthVersion    int
-	BaseFolderUUID string
+	Email                     string               `config:"Email"`
+	Password                  string               `config:"Password"`
+	APIKey                    string               `config:"API Key"`
+	Encoder                   encoder.MultiEncoder `config:"encoding"`
+	MasterKeys                string
+	PrivateKey                string
+	PublicKey                 string
+	AuthVersion               int
+	BaseFolderUUID            string
+	MaxDownloadThreads        int `config:"Max Download Threads"`
+	MaxDownloadThreadsPerFile int `config:"Max Download Threads per File"`
+	MaxUploadThreads          int `config:"Max Upload Threads"`
 }
 
 // Fs represents a virtual filesystem mounted on a specific root folder
