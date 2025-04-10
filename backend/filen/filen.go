@@ -32,20 +32,20 @@ func init() {
 		NewFs:       NewFs,
 		Options: []fs.Option{
 			{
-				Name:     "Email",
-				Help:     "The email of your Filen account",
+				Name:     "email",
+				Help:     "Email of your Filen account",
 				Required: true,
 			},
 			{
-				Name:       "Password",
-				Help:       "The password of your Filen account",
+				Name:       "password",
+				Help:       "Password of your Filen account",
 				Required:   true,
 				IsPassword: true,
 				Sensitive:  true,
 			},
 			{
-				Name: "API Key",
-				Help: `An API Key for your Filen account 
+				Name: "api_key",
+				Help: `API Key for your Filen account 
 
 Get this using the Filen CLI export-api-key command
 You can download the Filen CLI from https://github.com/FilenCloudDienste/filen-cli`,
@@ -60,44 +60,53 @@ You can download the Filen CLI from https://github.com/FilenCloudDienste/filen-c
 				Default:  encoder.Standard | encoder.EncodeInvalidUtf8,
 			},
 			{
-				Name:     "Max Download Threads",
-				Help:     "The maximum number of threads to use when downloading files.",
+				Name: "max_download_threads",
+				Help: `Max number of threads to use when downloading files.
+
+Each thread uses up to a bit over 1 MiB of memory.
+`,
 				Advanced: true,
 				Default:  sdk.DefaultMaxDownloadThreads,
 			},
 			{
-				Name:     "Max Download Threads per File",
-				Help:     "The maximum number of threads per file to use when downloading files.",
+				Name: "max_download_threads_per_file",
+				Help: `Max number of threads per file to use when downloading files.
+
+Each thread uses up to a bit over 1 MiB of memory.
+`,
 				Advanced: true,
 				Default:  sdk.DefaultMaxDownloadThreadsPerFile,
 			},
 			{
-				Name:     "Max Upload Threads",
-				Help:     "The maximum number of threads to use when uploading files.",
+				Name: "max_upload_threads",
+				Help: `Max number of threads to use when uploading files.
+
+Each thread uses up to a bit over 1 MiB of memory.
+`,
 				Advanced: true,
 				Default:  sdk.DefaultMaxUploadThreads,
 			},
 			{
-				Name:      "MasterKeys",
+				Name:      "master_keys",
 				Help:      "Master Keys (internal use only)",
 				Sensitive: true,
 				Advanced:  true,
 			}, {
-				Name:      "PrivateKey",
+				Name:      "private_key",
 				Help:      "Private RSA Key (internal use only)",
 				Sensitive: true,
 				Advanced:  true,
 			}, {
-				Name:      "PublicKey",
+				Name:      "public_key",
 				Help:      "Public RSA Key (internal use only)",
 				Sensitive: true,
 				Advanced:  true,
 			}, {
-				Name:     "AuthVersion",
+				Name:     "auth_version",
 				Help:     "Authentication Version (internal use only)",
 				Advanced: true,
 			}, {
-				Name:      "BaseFolderUUID",
+				Name:      "base_folder_uuid",
 				Help:      "UUID of Account Root Directory (internal use only)",
 				Sensitive: true,
 				Advanced:  true,
@@ -186,18 +195,18 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 
 // Options defines the configuration for this backend
 type Options struct {
-	Email                     string               `config:"Email"`
-	Password                  string               `config:"Password"`
-	APIKey                    string               `config:"API Key"`
+	Email                     string               `config:"email"`
+	Password                  string               `config:"password"`
+	APIKey                    string               `config:"api_key"`
 	Encoder                   encoder.MultiEncoder `config:"encoding"`
-	MasterKeys                string
-	PrivateKey                string
-	PublicKey                 string
-	AuthVersion               int
-	BaseFolderUUID            string
-	MaxDownloadThreads        int `config:"Max Download Threads"`
-	MaxDownloadThreadsPerFile int `config:"Max Download Threads per File"`
-	MaxUploadThreads          int `config:"Max Upload Threads"`
+	MasterKeys                string               `config:"master_keys"`
+	PrivateKey                string               `config:"private_key"`
+	PublicKey                 string               `config:"public_key"`
+	AuthVersion               int                  `config:"auth_version"`
+	BaseFolderUUID            string               `config:"base_folder_uuid"`
+	MaxDownloadThreads        int                  `config:"max_download_threads"`
+	MaxDownloadThreadsPerFile int                  `config:"max_download_threads_per_file"`
+	MaxUploadThreads          int                  `config:"max_upload_threads"`
 }
 
 // Fs represents a virtual filesystem mounted on a specific root folder
