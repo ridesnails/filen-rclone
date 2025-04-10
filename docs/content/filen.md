@@ -100,7 +100,7 @@ Here are the Standard options specific to filen (Filen).
 
 #### --filen-email
 
-Filen account email
+Email of your Filen account
 
 Properties:
 
@@ -111,7 +111,7 @@ Properties:
 
 #### --filen-password
 
-Filen account password
+Password of your Filen account
 
 **NB** Input to this must be obscured - see [rclone obscure](/commands/rclone_obscure/).
 
@@ -124,7 +124,10 @@ Properties:
 
 #### --filen-api-key
 
-Filen account API Key
+API Key for your Filen account 
+
+Get this using the Filen CLI export-api-key command
+You can download the Filen CLI from https://github.com/FilenCloudDienste/filen-cli
 
 **NB** Input to this must be obscured - see [rclone obscure](/commands/rclone_obscure/).
 
@@ -151,6 +154,103 @@ Properties:
 - Env Var:     RCLONE_FILEN_ENCODING
 - Type:        Encoding
 - Default:     Slash,Del,Ctl,InvalidUtf8,Dot
+
+#### --filen-max-download-threads
+
+Max number of threads to use when downloading files.
+
+Each thread uses up to a bit over 1 MiB of memory.
+
+
+Properties:
+
+- Config:      max_download_threads
+- Env Var:     RCLONE_FILEN_MAX_DOWNLOAD_THREADS
+- Type:        int
+- Default:     32
+
+#### --filen-max-download-threads-per-file
+
+Max number of threads per file to use when downloading files.
+
+Each thread uses up to a bit over 1 MiB of memory.
+
+
+Properties:
+
+- Config:      max_download_threads_per_file
+- Env Var:     RCLONE_FILEN_MAX_DOWNLOAD_THREADS_PER_FILE
+- Type:        int
+- Default:     8
+
+#### --filen-max-upload-threads
+
+Max number of threads to use when uploading files.
+
+Each thread uses up to a bit over 1 MiB of memory.
+
+
+Properties:
+
+- Config:      max_upload_threads
+- Env Var:     RCLONE_FILEN_MAX_UPLOAD_THREADS
+- Type:        int
+- Default:     64
+
+#### --filen-master-keys
+
+Master Keys (internal use only)
+
+Properties:
+
+- Config:      master_keys
+- Env Var:     RCLONE_FILEN_MASTER_KEYS
+- Type:        string
+- Required:    false
+
+#### --filen-private-key
+
+Private RSA Key (internal use only)
+
+Properties:
+
+- Config:      private_key
+- Env Var:     RCLONE_FILEN_PRIVATE_KEY
+- Type:        string
+- Required:    false
+
+#### --filen-public-key
+
+Public RSA Key (internal use only)
+
+Properties:
+
+- Config:      public_key
+- Env Var:     RCLONE_FILEN_PUBLIC_KEY
+- Type:        string
+- Required:    false
+
+#### --filen-auth-version
+
+Authentication Version (internal use only)
+
+Properties:
+
+- Config:      auth_version
+- Env Var:     RCLONE_FILEN_AUTH_VERSION
+- Type:        string
+- Required:    false
+
+#### --filen-base-folder-uuid
+
+UUID of Account Root Directory (internal use only)
+
+Properties:
+
+- Config:      base_folder_uuid
+- Env Var:     RCLONE_FILEN_BASE_FOLDER_UUID
+- Type:        string
+- Required:    false
 
 #### --filen-description
 
