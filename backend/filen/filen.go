@@ -438,7 +438,7 @@ func (dir *Directory) ModTime(ctx context.Context) time.Time {
 	}
 
 	if directory.Created.IsZero() {
-		obj, err := dir.fs.filen.FindDirectory(ctx, dir.path)
+		obj, err := dir.fs.filen.FindDirectory(ctx, dir.fs.resolvePath(dir.path))
 		newDir, ok := obj.(*types.Directory)
 		if err != nil || !ok {
 			return time.Now()
@@ -497,7 +497,7 @@ func (file *File) Remote() string {
 // It should return a best guess if one isn't available
 func (file *File) ModTime(ctx context.Context) time.Time {
 	if file.file.LastModified.IsZero() {
-		newFile, err := file.fs.filen.FindFile(ctx, file.path)
+		newFile, err := file.fs.filen.FindFile(ctx, file.fs.resolvePath(file.path))
 		if err == nil && newFile != nil {
 			file.file = newFile
 		}
@@ -517,7 +517,7 @@ func (file *File) Hash(ctx context.Context, ty hash.Type) (string, error) {
 		return "", hash.ErrUnsupported
 	}
 	if file.file.Hash == "" {
-		foundFile, err := file.fs.filen.FindFile(ctx, file.path)
+		foundFile, err := file.fs.filen.FindFile(ctx, file.fs.resolvePath(file.path))
 		if err != nil {
 			return "", err
 		}
