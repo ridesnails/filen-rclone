@@ -43,7 +43,7 @@ jobs:
           rm -rf ./build/docker-plugin
           docker buildx build \
             --no-cache --pull \
-            --build-arg BASE_IMAGE=ghcr.io/ridesnails/filen-rclone/rclone:latest \
+            --build-arg BASE_IMAGE=ghcr.io/ridesnails/filen-rclone:master \
             --platform linux/amd64 \
             --output ./build/docker-plugin/rootfs \
             ./contrib/docker-plugin/managed
