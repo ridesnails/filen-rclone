@@ -11,50 +11,35 @@ on:
         default: true
 
 jobs:
-  build_docker_plugin:
+  build_docker_volume_plugin:
+    if: inputs.manual || github.repository == 'rclone/rclone'
     name: Build docker plugin job
     runs-on: ubuntu-latest
     steps:
       - name: Free some space
+        shell: bash
         run: |
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet || true
+          df -h .
+          # Remove android SDK
+          sudo rm -rf /usr/local/lib/android || true
+          # Remove .net runtime
+          sudo rm -rf /usr/share/dotnet || true
+          df -h .
       - name: Checkout master
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Set up manifest/config for plugin
+      - name: Build and publish docker plugin
         shell: bash
         run: |
-          # 假定你仓库有contrib/docker-plugin/rootfs和config.json
-          # 如果没有，先调用makefile的plugin相关规则生成
-          mkdir -p ./plugin-build
-          cp -r ./contrib/docker-plugin/rootfs ./plugin-build/
-          cp ./contrib/docker-plugin/config.json ./plugin-build/
-          # 若你Makefile有 make plugin 或 make docker-plugin，可直接用
-
-      - name: Create docker plugin (AMD64示例)
-        shell: bash
-        run: |
-          # PLUGIN_NAME格式必须正确匹配docker要求
-          export PLUGIN_TAG=${GITHUB_REF##*/}
-          export PLUGIN_NAME=ghcr.io/${{ github.repository }}:${PLUGIN_TAG}
-          docker plugin create "$PLUGIN_NAME" ./plugin-build
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Push plugin to GHCR
-        shell: bash
-        run: |
-          export PLUGIN_TAG=${GITHUB_REF##*/}
-          export PLUGIN_NAME=ghcr.io/${{ github.repository }}:${PLUGIN_TAG}
-          docker plugin push "$PLUGIN_NAME"
-
-      # 可选：为不同架构分别build，分tag推送
-      # 推荐先实现amd64流程完整跑通，再多平台
+          VER=${GITHUB_REF#refs/tags/}
+          PLUGIN_USER=ghcr.io/${{ github.repository }}
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io --username ${{ github.actor }} --password-stdin
+          for PLUGIN_ARCH in amd64 arm64 arm/v7 arm/v6 ;do
+              export PLUGIN_USER PLUGIN_ARCH
+              make docker-plugin PLUGIN_TAG=${PLUGIN_ARCH/\//-}
+              make docker-plugin PLUGIN_TAG=${PLUGIN_ARCH/\//-}-${VER#v}
+          done
+          make docker-plugin PLUGIN_ARCH=amd64 PLUGIN_TAG=latest
+          make docker-plugin PLUGIN_ARCH=amd64 PLUGIN_TAG=${VER#v}
 
