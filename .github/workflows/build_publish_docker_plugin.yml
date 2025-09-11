@@ -13,35 +13,37 @@ on:
         description: Manual run (bypass default conditions)
         type: boolean
         default: true
-
 jobs:
   build_docker_volume_plugin:
-    if: inputs.manual || github.repository == 'rclone/rclone'
-    name: Build docker plugin job
     runs-on: ubuntu-latest
+
     steps:
       - name: Free some space
-        shell: bash
         run: |
-          df -h .
-          # Remove android SDK
-          sudo rm -rf /usr/local/lib/android || true
-          # Remove .net runtime
-          sudo rm -rf /usr/share/dotnet || true
-          df -h .
+          sudo apt-get clean
+          docker image prune -a -f || true
+
       - name: Checkout master
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build and publish docker plugin
-        shell: bash
         run: |
           VER=${GITHUB_REF#refs/tags/}
-          PLUGIN_USER=ghcr.io/${GITHUB_REPOSITORY}
-          for PLUGIN_ARCH in amd64 arm64 arm/v7 arm/v6 ;do
-            export PLUGIN_USER PLUGIN_ARCH
-            make docker-plugin PLUGIN_TAG=${PLUGIN_ARCH/\//-}
-            make docker-plugin PLUGIN_TAG=${PLUGIN_ARCH/\//-}-${VER#v}
-          done
-          make docker-plugin PLUGIN_ARCH=amd64 PLUGIN_TAG=latest
-          make docker-plugin PLUGIN_ARCH=amd64 PLUGIN_TAG=${VER#v}
+          docker buildx inspect | grep -q /amd64 || \
+            docker run --rm --privileged tonistiigi/binfmt --install all
+          rm -rf ./build/docker-plugin
+          docker buildx build \
+            --no-cache --pull \
+            --build-arg BASE_IMAGE=ghcr.io/ridesnails/filen-rclone/rclone:latest \
+            --platform linux/amd64 \
+            --output ./build/docker-plugin/rootfs \
+            ./contrib/docker-plugin/managed
