@@ -38,9 +38,8 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io --username ${{ github.actor }} --password-stdin
           for PLUGIN_ARCH in amd64 arm64 arm/v7 arm/v6 ;do
               export PLUGIN_USER PLUGIN_ARCH BASE_IMAGE
-              make docker-plugin PLUGIN_TAG=${PLUGIN_ARCH/\//-}
-              make docker-plugin PLUGIN_TAG=${PLUGIN_ARCH/\//-}-${VER#v}
+              make docker-plugin PLUGIN_TAG=${PLUGIN_ARCH/\//-} BASE_IMAGE=${BASE_IMAGE}
+              make docker-plugin PLUGIN_TAG=${PLUGIN_ARCH/\//-}-${VER#v} BASE_IMAGE=${BASE_IMAGE}
           done
-          export BASE_IMAGE
-          make docker-plugin PLUGIN_ARCH=amd64 PLUGIN_TAG=latest
-          make docker-plugin PLUGIN_ARCH=amd64 PLUGIN_TAG=${VER#v}
+          make docker-plugin PLUGIN_ARCH=amd64 PLUGIN_TAG=latest BASE_IMAGE=${BASE_IMAGE}
+          make docker-plugin PLUGIN_ARCH=amd64 PLUGIN_TAG=${VER#v} BASE_IMAGE=${BASE_IMAGE}
