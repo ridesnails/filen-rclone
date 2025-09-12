@@ -34,12 +34,11 @@ jobs:
         run: |
           VER=${GITHUB_REF#refs/tags/}
           PLUGIN_USER=ghcr.io/${{ github.repository }}
-          BASE_IMAGE=ghcr.io/ridesnails/filen-rclone/rclone:master
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io --username ${{ github.actor }} --password-stdin
           for PLUGIN_ARCH in amd64 arm64 arm/v7 arm/v6 ;do
-              export PLUGIN_USER PLUGIN_ARCH BASE_IMAGE
-              make docker-plugin PLUGIN_TAG=${PLUGIN_ARCH/\//-} BASE_IMAGE=${BASE_IMAGE}
-              make docker-plugin PLUGIN_TAG=${PLUGIN_ARCH/\//-}-${VER#v} BASE_IMAGE=${BASE_IMAGE}
+              export PLUGIN_USER PLUGIN_ARCH
+              make docker-plugin PLUGIN_TAG=${PLUGIN_ARCH/\//-}
+              make docker-plugin PLUGIN_TAG=${PLUGIN_ARCH/\//-}-${VER#v}
           done
-          make docker-plugin PLUGIN_ARCH=amd64 PLUGIN_TAG=latest BASE_IMAGE=${BASE_IMAGE}
-          make docker-plugin PLUGIN_ARCH=amd64 PLUGIN_TAG=${VER#v} BASE_IMAGE=${BASE_IMAGE}
+          make docker-plugin PLUGIN_ARCH=amd64 PLUGIN_TAG=latest
+          make docker-plugin PLUGIN_ARCH=amd64 PLUGIN_TAG=${VER#v}
