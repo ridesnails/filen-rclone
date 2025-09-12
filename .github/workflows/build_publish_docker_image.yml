@@ -1,6 +1,3 @@
----
-# Github Actions release for rclone
-# -*- compile-command: "yamllint -f parsable build_publish_docker_image.yml" -*-
 name: Build & Push Docker Images
 # Trigger the workflow on push or pull request
 on:
@@ -204,6 +201,7 @@ jobs:
             type=semver,pattern={{major}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=beta,enable={{is_default_branch}}
+            type=raw,value=latest,enable={{is_default_branch}}
       - name: Extract Tags
         shell: python
         run: |
