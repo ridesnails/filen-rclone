@@ -32,16 +32,32 @@ jobs:
       - name: Build and publish docker plugin
         shell: bash
         run: |
-          VER=${GITHUB_REF#refs/tags/}
+          # Derive a safe version/tag name:
+          # - Prefer GITHUB_REF_NAME (pure branch or tag name)
+          # - Strip leading 'v'
+          # - Replace any chars not in [A-Za-z0-9_.-] with '-'
+          RAW_REF_NAME="${GITHUB_REF_NAME:-}"
+          if [ -z "$RAW_REF_NAME" ]; then
+            # Fallback for older runners: take last path segment of GITHUB_REF
+            RAW_REF_NAME="${GITHUB_REF##*/}"
+          fi
+          VER="${RAW_REF_NAME#v}"
+          VER_SAFE="$(echo "$VER" | sed 's/[^A-Za-z0-9_.-]/-/g')"
+
           PLUGIN_USER=ghcr.io/${{ github.repository }}
           PLUGIN_BASE=ghcr.io/ridesnails/filen-rclone:latest
           
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io --username ${{ github.actor }} --password-stdin
           
-          for PLUGIN_ARCH in amd64 arm64 arm/v7 arm/v6 ;do
+          for PLUGIN_ARCH in amd64 arm64 arm/v7 arm/v6 ; do
+            ARCH_TAG="${PLUGIN_ARCH/\//-}"
             export PLUGIN_USER PLUGIN_ARCH
-            make docker-plugin PLUGIN_TAG=${PLUGIN_ARCH/\//-}           PLUGIN_BASE=${PLUGIN_BASE}
-            make docker-plugin PLUGIN_TAG=${PLUGIN_ARCH/\//-}-${VER#v}  PLUGIN_BASE=${PLUGIN_BASE}
+            # Base arch tag (e.g., amd64, arm64, arm-v7, arm-v6)
+            make docker-plugin PLUGIN_TAG="${ARCH_TAG}"                PLUGIN_BASE="${PLUGIN_BASE}"
+            # Versioned arch tag (e.g., amd64-master or amd64-1.2.3)
+            make docker-plugin PLUGIN_TAG="${ARCH_TAG}-${VER_SAFE}"    PLUGIN_BASE="${PLUGIN_BASE}"
           done
-          make docker-plugin PLUGIN_ARCH=amd64 PLUGIN_TAG=latest  PLUGIN_BASE=${PLUGIN_BASE}
-          make docker-plugin PLUGIN_ARCH=amd64 PLUGIN_TAG=${VER#v} PLUGIN_BASE=${PLUGIN_BASE}
+
+          # Latest and version-only tags for amd64
+          make docker-plugin PLUGIN_ARCH=amd64 PLUGIN_TAG=latest        PLUGIN_BASE="${PLUGIN_BASE}"
+          make docker-plugin PLUGIN_ARCH=amd64 PLUGIN_TAG="${VER_SAFE}" PLUGIN_BASE="${PLUGIN_BASE}"
